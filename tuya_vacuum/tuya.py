@@ -1,10 +1,18 @@
-"""Handles communication with the Tuya Cloud API."""
-
-import uuid
-import datetime
+"""Handles communication with a Tuya Cloud API."""
+from datetime import datetime
 import hmac
-import requests
+from uuid import uuid4
+import logging
 
+import httpx
+
+_LOGGER = logging.getLogger(__name__)
+
+# The SHA256 hash of a empty request body
+EMPTY_BODY_HASH = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+# Tuya Cloud API endpoint to get an access token
+ACCESS_TOKEN_ENDPOINT = "/v1.0/token?grant_type=1"
 
 class InvalidClientIDError(Exception):
     """Invalid Client ID Error."""
@@ -23,41 +31,79 @@ class CrossRegionAccessError(Exception):
 
 
 class TuyaCloudAPI:
-    """Handles communication with the Tuya Cloud API."""
+    """Handles communication with a Tuya Cloud API."""
 
-    def __init__(self, base: str, client_id: str, client_secret: str) -> None:
-        self.base = base
+    def __init__(
+        self,
+        origin: str,
+        client_id: str,
+        client_secret: str,
+        client: httpx.Client = None,
+    ) -> None:
+        """
+        Initialize the TuyaCloudAPI instance.
+
+        Parameters:
+            origin (str): The Tuya Cloud API endpoint.
+            client_id (str): The client ID for the Tuya API.
+            client_secret (str): The client secret for the Tuya API.
+            client (httpx.Client): (optional) The HTTP client/session to use for requests.
+
+        The **origin** must contain the protocol and host of the Tuya API endpoint.
+        URL anatomy is defined here https://developer.mozilla.org/en-US/docs/Web/API/Location.
+        """
+        self.origin = origin
         self.client_id = client_id
         self.client_secret = client_secret
 
-    def _generate_signature(
+        if client is None:
+            self.client = httpx.Client(timeout=2.5)
+        else:
+            self.client = client
+
+    def __del__(self) -> None:
+        """Close the HTTP client when the instance is deleted."""
+        self.client.close()
+
+    def _create_signature(
         self,
+        method: str,
         endpoint: str,
         timestamp: str,
         nonce: str,
-        access_token: str = "",
+        access_token: str,
+        signature_key: str = "",
     ) -> str:
-        """Generate signature to make requests to APIs."""
-        # https://developer.tuya.com/en/docs/iot/new-singnature
+        """
+        Generate a signature required for Tuya Cloud authorization.
 
-        # The SHA256 hash of a empty request body
-        empty_body_hash = (
-            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-        )
+        To make a request to a API endpoint, 
+        you need to provide a signature to verify your identity and ensure data security.
 
-        http_method = "GET"
+        Parameters:
+            method (str): The HTTP method used for the request.
+            endpoint (str): The endpoint requested.
+            timestamp (str): The 13-digit timestamp.
+            nonce (str): The UUID generated for each API request.
+            access_token (str): The access token used for the request.
+            signature_key (str):
+                (optional) A string in which all headers are concatenated with newlines.
 
-        # TTODO: Implement Optional_Signature_key
-        optional_signature_key = ""
+        Returns:
+            signature (str): The signature for the request.
+
+        The signature algorithm is documented here:
+        https://developer.tuya.com/en/docs/iot/new-singnature?id=Kbw0q34cs2e5g
+        """
 
         str_to_sign = (
             f"{self.client_id}"
             f"{access_token}"
             f"{timestamp}"
             f"{nonce}"
-            f"{http_method}\n"
-            f"{empty_body_hash}\n"
-            f"{optional_signature_key}\n"
+            f"{method}\n"
+            f"{EMPTY_BODY_HASH}\n"
+            f"{signature_key}\n"
             f"{endpoint}"
         )
 
@@ -73,25 +119,51 @@ class TuyaCloudAPI:
 
         return signature
 
-    def raw_request(self, endpoint: str, access_token: str = "") -> dict:
-        """Make request to the Tuya Cloud API."""
+    def request(
+        self,
+        method: str,
+        endpoint: str,
+        fetch_token: bool = True
+    ) -> dict:
+        """
+        Make a request to a Tuya Cloud API endpoint.
+
+        Parameters:
+            method (str): The HTTP method to use for the request.
+            endpoint (str): The endpoint to request.
+            fetch_token (bool): (optional) Whether to fetch a new access token first.
+
+        If **fetch_token** is True but **access_token** is provided, 
+        the **access_token** will be used.
+
+        The request structure is documented here:
+        https://developer.tuya.com/en/docs/iot/api-request?id=Ka4a8uuo1j4t4
+        """
+
+        _LOGGER.debug("Making '%s' request to '%s' at '%s'", method, self.origin, endpoint)
+        
+        access_token = ""
+        if fetch_token:
+            _LOGGER.debug("Fetching access token")
+            response = self.request("GET", ACCESS_TOKEN_ENDPOINT, fetch_token=False)
+            access_token = response["result"]["access_token"]
 
         # The 13-digit timestamp
-        timestamp = str(int(round(datetime.datetime.now().timestamp() * 1000, 0)))
+        timestamp = str(int(round(datetime.now().timestamp() * 1000, 0)))
 
         # UUID generated for each API request
         # 32-character lowercase hexadecimal string
-        nonce = uuid.uuid4().hex
+        nonce = uuid4().hex
 
         # Generate sign
-        signature = self._generate_signature(
+        signature = self._create_signature(
+            method=method,
             endpoint=endpoint,
             timestamp=timestamp,
             nonce=nonce,
             access_token=access_token,
         )
 
-        # https://developer.tuya.com/en/docs/iot/api-request?id=Ka4a8uuo1j4t4
         headers = {
             "client_id": self.client_id,  # The user ID
             "sign": signature,  # The signature generated by signature algorithm
@@ -101,15 +173,14 @@ class TuyaCloudAPI:
             "nonce": nonce,  # (optional) The UUID generated for each API request
         }
 
-        # If this is a General Business API, the access token is required
         if access_token:
             headers["access_token"] = access_token
 
-        response = requests.get(
-            self.base + endpoint, headers=headers, timeout=2.5
+        response = self.client.request(
+            method,
+            f"{self.origin}{endpoint}",
+            headers=headers,
         ).json()
-
-        print(response)
 
         # Check if the request failed
         if not response["success"]:
@@ -141,14 +212,4 @@ class TuyaCloudAPI:
 
         return response
 
-    def request(self, endpoint: str) -> dict:
-        """Make authenticated request to the Tuya Cloud API."""
 
-        # Get access token
-        response = self.raw_request("/v1.0/token?grant_type=1")
-
-        access_token = response["result"]["access_token"]
-
-        response = self.raw_request(endpoint, access_token)
-
-        return response
