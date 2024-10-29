@@ -23,8 +23,8 @@ def test_tuya_request():
 
     BASE = "https://openapi.tuyaus.com"
     ENDPOINT = f"/v1.0/users/sweepers/file/{DEVICE_ID}/realtime-map"
-    tuya = TuyaCloudAPI(base=BASE, client_id=CLIENT_ID, client_secret=CLIENT_SECRET)
+    tuya = TuyaCloudAPI(origin=BASE, client_id=CLIENT_ID, client_secret=CLIENT_SECRET)
 
-    response = tuya.request(ENDPOINT)
+    response = tuya.request("GET", ENDPOINT)
     print(response)
     assert response["success"]
