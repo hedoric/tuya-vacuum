@@ -141,7 +141,7 @@ class TuyaCloudAPI:
         """
 
         _LOGGER.debug("Making '%s' request to '%s' at '%s'", method, self.origin, endpoint)
-        
+
         access_token = ""
         if fetch_token:
             _LOGGER.debug("Fetching access token")
@@ -211,5 +211,3 @@ class TuyaCloudAPI:
                 raise RuntimeError(f"Request failed, unknown error: {response}")
 
         return response
-
-
