@@ -42,7 +42,7 @@ This is a list of all currently tested devices. Create a new [issue](https://git
 
 | Device                                                | Support                           |
 | ----------------------------------------------------- | --------------------------------- |
-| [Lefant M1](https://www.lefant.com/en-ca/products/m1) | $${\color{lightgreen}Supported}$$ |
+| [Lefant M1](https://www.lefant.com/en-ca/products/m1) | <text style="color:lightgreen">Supported</text> |
 
 ## Special Thanks
 - [Tuya Cloud Vacuum Map Extractor](https://github.com/oven-lab/tuya_cloud_map_extractor) by [@oven-lab](https://github.com/oven-lab)
