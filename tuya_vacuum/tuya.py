@@ -1,7 +1,8 @@
 """Handles communication with a Tuya Cloud API."""
-from datetime import datetime
+import datetime
 import hmac
-from uuid import uuid4
+#from uuid import uuid4
+import uuid
 import logging
 
 import httpx
@@ -61,11 +62,7 @@ class TuyaCloudAPI:
         else:
             self.client = client
 
-    def __del__(self) -> None:
-        """Close the HTTP client when the instance is deleted."""
-        self.client.close()
-
-    def _create_signature(
+    def create_signature(
         self,
         method: str,
         endpoint: str,
@@ -118,6 +115,23 @@ class TuyaCloudAPI:
         )
 
         return signature
+    
+    @staticmethod
+    def get_timestamp() -> str:
+        """
+        Get the 13-digit timestamp needed for Tuya Cloud API requests.
+        """
+        return str(int(round(datetime.datetime.now().timestamp() * 1000, 0)))
+
+    @staticmethod
+    def get_nonce() -> str:
+        """
+        Get a UUID optionally required for each API request.
+
+        Returns:
+            nonce (str): A random 32-character lowercase hexadecimal string.
+        """
+        return uuid.uuid4().hex
 
     def request(
         self,
@@ -149,14 +163,14 @@ class TuyaCloudAPI:
             access_token = response["result"]["access_token"]
 
         # The 13-digit timestamp
-        timestamp = str(int(round(datetime.now().timestamp() * 1000, 0)))
+        timestamp = self.get_timestamp()
 
         # UUID generated for each API request
         # 32-character lowercase hexadecimal string
-        nonce = uuid4().hex
+        nonce = self.get_nonce()
 
         # Generate sign
-        signature = self._create_signature(
+        signature = self.create_signature(
             method=method,
             endpoint=endpoint,
             timestamp=timestamp,
