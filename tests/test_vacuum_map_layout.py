@@ -3,6 +3,7 @@
 from tuya_vacuum.vacuum_map_layout import VacuumMapLayout
 
 
+
 def test_vacuum_map_header():
     """Test how the vacuum map header is parsed."""
 

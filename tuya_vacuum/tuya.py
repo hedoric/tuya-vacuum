@@ -1,9 +1,11 @@
 """Handles communication with a Tuya Cloud API."""
+
 import datetime
 import hmac
-#from uuid import uuid4
-import uuid
 import logging
+
+# from uuid import uuid4
+import uuid
 
 import httpx
 
@@ -14,6 +16,7 @@ EMPTY_BODY_HASH = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b
 
 # Tuya Cloud API endpoint to get an access token
 ACCESS_TOKEN_ENDPOINT = "/v1.0/token?grant_type=1"
+
 
 class InvalidClientIDError(Exception):
     """Invalid Client ID Error."""
@@ -74,7 +77,7 @@ class TuyaCloudAPI:
         """
         Generate a signature required for Tuya Cloud authorization.
 
-        To make a request to a API endpoint, 
+        To make a request to a API endpoint,
         you need to provide a signature to verify your identity and ensure data security.
 
         Parameters:
@@ -115,7 +118,7 @@ class TuyaCloudAPI:
         )
 
         return signature
-    
+
     @staticmethod
     def get_timestamp() -> str:
         """
@@ -133,12 +136,7 @@ class TuyaCloudAPI:
         """
         return uuid.uuid4().hex
 
-    def request(
-        self,
-        method: str,
-        endpoint: str,
-        fetch_token: bool = True
-    ) -> dict:
+    def request(self, method: str, endpoint: str, fetch_token: bool = True) -> dict:
         """
         Make a request to a Tuya Cloud API endpoint.
 
@@ -147,14 +145,16 @@ class TuyaCloudAPI:
             endpoint (str): The endpoint to request.
             fetch_token (bool): (optional) Whether to fetch a new access token first.
 
-        If **fetch_token** is True but **access_token** is provided, 
+        If **fetch_token** is True but **access_token** is provided,
         the **access_token** will be used.
 
         The request structure is documented here:
         https://developer.tuya.com/en/docs/iot/api-request?id=Ka4a8uuo1j4t4
         """
 
-        _LOGGER.debug("Making '%s' request to '%s' at '%s'", method, self.origin, endpoint)
+        _LOGGER.debug(
+            "Making '%s' request to '%s' at '%s'", method, self.origin, endpoint
+        )
 
         access_token = ""
         if fetch_token:

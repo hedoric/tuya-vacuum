@@ -25,3 +25,6 @@ Issues = "https://github.com/jaidenlabelle/tuya-vacuum/issues"
 markers = [
     "functional: mark a test as functional (can be slow or require external resources)",
 ]
+
+[tool.ruff.lint]
+extend-select = ["PLE"]
