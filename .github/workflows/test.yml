@@ -4,7 +4,7 @@ on: push
 
 jobs:
   build:
-    name: Build
+    name: Build and Test
     runs-on: ubuntu-latest
 
     steps:
@@ -22,14 +22,6 @@ jobs:
           pip install -r requirements.txt
       - name: Install pytest
         run: pip install pytest pytest-cov
-  
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    needs:
-      build
-
-    steps:
       - name: Test with pytest
         run: pytest ./tests --doctest-modules --junitxml=junit/test-results.xml --cov=com --cov-report=xml --cov-report=html
       - name: Upload pytest test results
