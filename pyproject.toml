@@ -20,3 +20,8 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/jaidenlabelle/tuya-vacuum"
 Issues = "https://github.com/jaidenlabelle/tuya-vacuum/issues"
+
+[tool.pytest.ini_options]
+markers = [
+    "functional: mark a test as functional (can be slow or require external resources)",
+]

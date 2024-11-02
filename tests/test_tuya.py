@@ -1,209 +1,296 @@
 """Functional test for communication with the Tuya Cloud API."""
 
 import logging
+import os
 from uuid import UUID
 import httpx
 from pytest_httpx import HTTPXMock
 from pytest_mock import MockerFixture
-from freezegun import freeze_time
+import freezegun
 import pytest
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from tuya_vacuum.tuya import CrossRegionAccessError, InvalidClientIDError, InvalidDeviceIDError, TuyaCloudAPI, InvalidClientSecretError
 
 _LOGGER = logging.getLogger(__name__)
 
-CLIENT_ID = "example"
-CLIENT_SECRET = "example"
-DEVICE_ID = "example"
-ORIGIN = "https://openapi.tuyaus.com"
-ENDPOINT = f"/v1.0/users/sweepers/file/{DEVICE_ID}/realtime-map"
+CORRECT_CLIENT_ID = "correct_client_id"
+CORRECT_CLIENT_SECRET = "correct_client_secret"
+CORRECT_DEVICE_ID = "correct_device_id"
+CORRECT_ORIGIN = "https://correct_origin.com" # Origin of the correct server for the device
 
+WRONG_CLIENT_ID = "wrong_client_id"
+WRONG_CLIENT_SECRET = "wrong_client_secret"
+WRONG_DEVICE_ID = "wrong_device_id"
+WRONG_ORIGIN = "https://invalid_origin.com" # Origin of the wrong server for the device
+
+EXPECTED_TIMESTAMP = "1730548801000"
+EXPECTED_NONCE = "0e950a259a734b8ebae786f131450350"
+EXPECTED_TOKEN_SIGNATURE = "FD292F4D67C58E088B953E4A66883C2394A56DC3806F3581876858F1F2A0F997"
+EXPECTED_REALTIME_MAP_SIGNATURE = "D8A0B35D37F75AEFE3B1F19F18A53FBCC9CB9C55779C4BF860CA0DFB43CAF5FD"
+EXPECTED_ACCESS_TOKEN = "correct_access_token"
+EXPECTED_LAYOUT_MAP_URL = "correct_layout_map_url"
+EXPECTED_PATH_MAP_URL = "correct_path_map_url"
+
+WRONG_TOKEN_SIGNATURE = "16B758933F6DECA1098948359545C4FA6BC6899AA87C09579A9DDE7A6F2F6AA5"
+
+# Mock the uuid4 function to a fixed value
+DEFINED_UUID = UUID('0e950a25-9a73-4b8e-bae7-86f131450350')
 # Mock the datetime module to a fixed time
-@freeze_time("2024-11-02 12:00:01")
-def test_get_timestamp():
-    """Test TuyaCloudAPI.get_timestamp."""
+DEFINED_TIME = "2024-11-02 12:00:01"
 
-    assert TuyaCloudAPI.get_timestamp() == "1730548801000"
+ACCESS_TOKEN_ENDPOINT = "/v1.0/token?grant_type=1"
 
-def test_get_nonce(mocker: MockerFixture):
-    """Test TuyaCloudAPI.get_nonce."""
+# Dangerous to use this option as it can lead to regression
+pytestmark = pytest.mark.httpx_mock(assert_all_responses_were_requested=False)
 
-    # Mock the UUID generation
-    mocker.patch("uuid.uuid4", return_value=UUID('0e950a25-9a73-4b8e-bae7-86f131450350'))
+def get_realtime_map_endpoint(device_id: str) -> str:
+    """Get the endpoint to request the realtime map data for a device."""
 
-    assert TuyaCloudAPI.get_nonce() == "0e950a259a734b8ebae786f131450350"
+    return f"/v1.0/users/sweepers/file/{device_id}/realtime-map"
 
-def test_create_signature():
-    """Test TuyaCloudAPI.create_signature."""
-    tuya = TuyaCloudAPI(origin=ORIGIN, client_id=CLIENT_ID, client_secret=CLIENT_SECRET)
+@pytest.fixture(autouse=True)
+def frozen_time(request: pytest.FixtureRequest):
+    """Set the time for all tests to a defined time by default."""
 
-    method = "GET"
-    endpoint = ENDPOINT
-    timestamp = "1730548801000"
-    nonce = "0e950a259a734b8ebae786f131450350"
-    access_token = "example_access_token"
+    # Skip the time freezing for functional tests
+    if "functional" in request.keywords:
+        yield
+    else:
+        # Freeze the time
+        with freezegun.freeze_time(DEFINED_TIME):
+            yield
 
-    tuya = TuyaCloudAPI(origin=ORIGIN, client_id=CLIENT_ID, client_secret=CLIENT_SECRET)
-    signature = tuya.create_signature(method, endpoint, timestamp, nonce, access_token)
+@pytest.fixture(name = "mock_api")
+def fixture_mock_api(httpx_mock: HTTPXMock) -> httpx.Client:
+    """Mock responses from the Tuya Cloud API."""
 
-    assert signature == "7ADE4474E49D93106F236A261C539CFEC7C89801047896F5A3376202B422A8FD"
-
-# Mock the datetime module to a fixed time
-@freeze_time("2024-11-02 12:00:01")
-def test_request(mocker: MockerFixture, httpx_mock: HTTPXMock):
-    """Test TuyaCloudAPI.request."""
-
-    # Mock response for the request to get the access token
+    # Correct access token request
     httpx_mock.add_response(
-        url = f"{ORIGIN}/v1.0/token?grant_type=1",
+        url = f"{CORRECT_ORIGIN}{ACCESS_TOKEN_ENDPOINT}",
+        match_headers = {
+            "client_id": CORRECT_CLIENT_ID,
+            "sign": EXPECTED_TOKEN_SIGNATURE,
+            "t": EXPECTED_TIMESTAMP,
+            "lang": "en",
+            "nonce": EXPECTED_NONCE
+        },
         json = {
             "success": True,
             "result": {
-                "access_token": "example_access_token",
+                "access_token": EXPECTED_ACCESS_TOKEN
             }
         }
     )
-    # Mock response for the request to get the map URLs
+
+    # Correct realtime map request
     httpx_mock.add_response(
-        url = f"{ORIGIN}{ENDPOINT}",
+        url = f"{CORRECT_ORIGIN}{get_realtime_map_endpoint(CORRECT_DEVICE_ID)}",
+        match_headers = {
+            "client_id": CORRECT_CLIENT_ID,
+            "sign": EXPECTED_REALTIME_MAP_SIGNATURE,
+            "t": EXPECTED_TIMESTAMP,
+            "lang": "en",
+            "nonce": EXPECTED_NONCE
+        },
         json = {
             "success": True,
             "result": [
                 {
-                    "map_url": "example_layout_map_url",
+                    "map_url": EXPECTED_LAYOUT_MAP_URL,
                     "map_type": 0
                 },
                 {
-                    "map_url": "example_path_map_url",
+                    "map_url": EXPECTED_PATH_MAP_URL,
                     "map_type": 1
                 }
             ]
         }
     )
 
-    # Mock the UUID generation
-    mocker.patch("uuid.uuid4", return_value=UUID('0e950a25-9a73-4b8e-bae7-86f131450350'))
-
-    with httpx.Client() as client:
-        # Create a TuyaCloudAPI instance
-        tuya = TuyaCloudAPI(
-            origin=ORIGIN,
-            client_id=CLIENT_ID,
-            client_secret=CLIENT_SECRET,
-            client=client
-        )
-
-        response = tuya.request("GET", ENDPOINT)
-
-        # Check if the returned values are correct
-        # Check if the response is successful
-        assert response["success"]
-        # Check if the layout map URL is correct
-        assert response["result"][0]["map_url"] == "example_layout_map_url"
-        # Check if the path map URL is correct
-        assert response["result"][1]["map_url"] == "example_path_map_url"
-
-        requests = httpx_mock.get_requests()
-
-        # Check if the access token request was successful
-        request = requests[0]
-        headers = request.headers
-        assert request.url == f"{ORIGIN}/v1.0/token?grant_type=1"
-        assert headers.get("client_id") == CLIENT_ID
-        assert headers.get("sign") == (
-            "B557C364FD291EFF020769E5D1D1689C7C9BAF9AFAA7D936CCA26361D01B17DE"
-        )
-        assert headers.get("sign_method") == "HMAC-SHA256"
-        assert headers.get("t") == "1730548801000"
-        assert headers.get("lang") == "en"
-        assert headers.get("nonce") == "0e950a259a734b8ebae786f131450350"
-
-        # Check if the endpoint request was successful
-        request = requests[1]
-        headers = request.headers
-        assert request.url == f"{ORIGIN}{ENDPOINT}"
-        assert headers.get("client_id") == CLIENT_ID
-        assert headers.get("sign") == (
-            "7ADE4474E49D93106F236A261C539CFEC7C89801047896F5A3376202B422A8FD"
-        )
-        assert headers.get("sign_method") == "HMAC-SHA256"
-        assert headers.get("t") == "1730548801000"
-        assert headers.get("lang") == "en"
-        assert headers.get("nonce") == "0e950a259a734b8ebae786f131450350"
-
-def test_invalid_request(httpx_mock: HTTPXMock):
-    """Test TuyaCloudAPI.request with an invalid request."""
-
-    # Invalid client id request
+    # Invalid client id access token request
     httpx_mock.add_response(
-        url = f"{ORIGIN}/v1.0/token?grant_type=1",
-        match_headers={"client_id": "wrong_client_id"},
+        url = f"{CORRECT_ORIGIN}{ACCESS_TOKEN_ENDPOINT}",
+        match_headers = {
+            "client_id": WRONG_CLIENT_ID,
+            # "sign": EXPECTED_TOKEN_SIGNATURE, Sign is tied to the client id
+            "t": EXPECTED_TIMESTAMP,
+            "lang": "en",
+            "nonce": EXPECTED_NONCE
+        },
         json = {
             "success": False,
-            "code": 1005,
+            "code": 1005
         }
     )
 
-
-    # Invalid origin
+    # Invalid sign access token request
     httpx_mock.add_response(
-        url = "https://invalid_origin.com/v1.0/token?grant_type=1",
+        url = f"{CORRECT_ORIGIN}{ACCESS_TOKEN_ENDPOINT}",
+        match_headers = {
+            "client_id": CORRECT_CLIENT_ID,
+            "sign":  WRONG_TOKEN_SIGNATURE,
+            "t": EXPECTED_TIMESTAMP,
+            "lang": "en",
+            "nonce": EXPECTED_NONCE
+        },
         json = {
             "success": False,
-            "code": 2007,
+            "code": 1004
         }
     )
 
-    # Mock response for the request to get the map URLs
+    # Invalid origin realtime map request
     httpx_mock.add_response(
-        url = f"{ORIGIN}/invalid_device_id/realtime-map",
+        url = f"{WRONG_ORIGIN}{ACCESS_TOKEN_ENDPOINT}",
+        match_headers = {
+            "client_id": CORRECT_CLIENT_ID,
+            "sign": EXPECTED_TOKEN_SIGNATURE,
+            "t": EXPECTED_TIMESTAMP,
+            "lang": "en",
+            "nonce": EXPECTED_NONCE
+        },
+        json = {
+            "success": False,
+            "code": 2007
+        }
+    )
+
+    # Invalid device id realtime map request
+    httpx_mock.add_response(
+        url = f"{CORRECT_ORIGIN}{get_realtime_map_endpoint(WRONG_DEVICE_ID)}",
         json = {
             "success": False,
             "code": 1106
         }
     )
 
-    with httpx.Client() as client:
-        # # Create a TuyaCloudAPI instance
-        # tuya = TuyaCloudAPI(
-        #     origin=ORIGIN,
-        #     client_id=CLIENT_ID,
-        #     client_secret="wrong_client_secret",
-        #     client=client
-        # )
+    return httpx.Client()
 
-        # with pytest.raises(InvalidClientSecretError):
-        #     tuya.request("GET", "/v1.0/token?grant_type=1", fetch_token=False)
+@pytest.fixture(name = "tuya")
+def fixture_tuya(request: pytest.FixtureRequest, mocker: MockerFixture, mock_api: httpx.Client) -> TuyaCloudAPI:
+    """Create a TuyaCloudAPI instance for testing."""
 
-        # Create a TuyaCloudAPI instance
-        tuya = TuyaCloudAPI(
-            origin=ORIGIN,
-            client_id="wrong_client_id",
-            client_secret=CLIENT_SECRET,
-            client=client
-        )
+    # Mock the UUID generation
+    mocker.patch("uuid.uuid4", return_value=DEFINED_UUID)
 
-        with pytest.raises(InvalidClientIDError):
-            tuya.request("GET", "/v1.0/token?grant_type=1", fetch_token=False)
+    # Avoid error if not parametrized
+    if not hasattr(request, "param"):
+        request.param = {}
 
-        # Create a TuyaCloudAPI instance
-        tuya = TuyaCloudAPI(
-            origin="https://invalid_origin.com",
-            client_id=CLIENT_ID,
-            client_secret=CLIENT_SECRET,
-            client=client
-        )
+    # Get the parameters for the TuyaCloudAPI instance
+    origin = request.param.get("origin", CORRECT_ORIGIN)
+    client_id = request.param.get("client_id", CORRECT_CLIENT_ID)
+    client_secret = request.param.get("client_secret", CORRECT_CLIENT_SECRET)
 
-        with pytest.raises(CrossRegionAccessError):
-            tuya.request("GET", "/v1.0/token?grant_type=1", fetch_token=False)
+    return TuyaCloudAPI(origin, client_id, client_secret, mock_api)
 
-        # Create a TuyaCloudAPI instance
-        tuya = TuyaCloudAPI(
-            origin=ORIGIN,
-            client_id=CLIENT_ID,
-            client_secret=CLIENT_SECRET,
-            client=client
-        )
+# Mock the datetime module to a fixed time
+#@freeze_time("2024-11-02 12:00:01")
+def test_get_timestamp(tuya: TuyaCloudAPI):
+    """Test TuyaCloudAPI.get_timestamp."""
 
-        with pytest.raises(InvalidDeviceIDError):
-            tuya.request("GET", "/invalid_device_id/realtime-map", fetch_token=False)
+    assert tuya.get_timestamp() == EXPECTED_TIMESTAMP
+
+def test_get_nonce(tuya: TuyaCloudAPI):
+    """Test TuyaCloudAPI.get_nonce."""
+
+    assert tuya.get_nonce() == EXPECTED_NONCE
+
+def test_create_signature(tuya: TuyaCloudAPI):
+    """Test TuyaCloudAPI.create_signature."""
+
+    method = "GET"
+    endpoint = get_realtime_map_endpoint(CORRECT_DEVICE_ID)
+    timestamp = EXPECTED_TIMESTAMP
+    nonce = EXPECTED_NONCE
+    access_token = EXPECTED_ACCESS_TOKEN
+
+    signature = tuya.create_signature(method, endpoint, timestamp, nonce, access_token)
+
+    assert signature == EXPECTED_REALTIME_MAP_SIGNATURE
+
+def test_request(tuya: TuyaCloudAPI, httpx_mock: HTTPXMock):
+    """Test TuyaCloudAPI.request."""
+
+    response = tuya.request("GET", get_realtime_map_endpoint(CORRECT_DEVICE_ID))
+
+    assert response["success"]
+    assert response["result"][0]["map_url"] == EXPECTED_LAYOUT_MAP_URL
+    assert response["result"][1]["map_url"] == EXPECTED_PATH_MAP_URL
+
+    requests = httpx_mock.get_requests()
+
+    # Check if the access token request was successful
+    request = requests[0]
+    headers = request.headers
+    assert request.url == f"{CORRECT_ORIGIN}{ACCESS_TOKEN_ENDPOINT}"
+    assert headers.get("client_id") == CORRECT_CLIENT_ID
+    assert headers.get("sign") == EXPECTED_TOKEN_SIGNATURE
+    assert headers.get("sign_method") == "HMAC-SHA256"
+    assert headers.get("t") == EXPECTED_TIMESTAMP
+    assert headers.get("lang") == "en"
+    assert headers.get("nonce") == EXPECTED_NONCE
+
+    # Check if the endpoint request was successful
+    request = requests[1]
+    headers = request.headers
+    assert request.url == f"{CORRECT_ORIGIN}{get_realtime_map_endpoint(CORRECT_DEVICE_ID)}"
+    assert headers.get("client_id") == CORRECT_CLIENT_ID
+    assert headers.get("sign") == EXPECTED_REALTIME_MAP_SIGNATURE
+    assert headers.get("sign_method") == "HMAC-SHA256"
+    assert headers.get("t") == EXPECTED_TIMESTAMP
+    assert headers.get("lang") == "en"
+    assert headers.get("nonce") == EXPECTED_NONCE
+
+@pytest.mark.parametrize("tuya", [{ "client_id": WRONG_CLIENT_ID }], indirect=True)
+def test_invalid_client_id(tuya: TuyaCloudAPI):
+    """Test TuyaCloudAPI.request with an invalid client id."""
+
+    with pytest.raises(InvalidClientIDError):
+        tuya.request("GET", ACCESS_TOKEN_ENDPOINT)
+
+@pytest.mark.parametrize("tuya", [{ "client_secret": WRONG_CLIENT_SECRET }], indirect=True)
+def test_invalid_client_secret(tuya: TuyaCloudAPI):
+    """Test TuyaCloudAPI.request with an invalid client secret."""
+
+    with pytest.raises(InvalidClientSecretError):
+        tuya.request("GET", ACCESS_TOKEN_ENDPOINT)
+
+@pytest.mark.parametrize("tuya", [{ "origin": WRONG_ORIGIN }], indirect=True)
+def test_invalid_origin(tuya: TuyaCloudAPI):
+    """Test TuyaCloudAPI.request with an invalid origin."""
+
+    with pytest.raises(CrossRegionAccessError):
+        tuya.request("GET", ACCESS_TOKEN_ENDPOINT)
+
+def test_invalid_device_id(tuya: TuyaCloudAPI):
+    """Test TuyaCloudAPI.request with an invalid device id."""
+
+    with pytest.raises(InvalidDeviceIDError):
+        tuya.request("GET", get_realtime_map_endpoint(WRONG_DEVICE_ID))
+
+@pytest.mark.functional
+def test_real_request():
+    """Test TuyaCloudAPI.request with a real request to the cloud."""
+
+    # Try to get the Tuya Cloud API credentials from the environment
+    origin = os.getenv("ORIGIN")
+    client_id = os.getenv("CLIENT_ID")
+    client_secret = os.getenv("CLIENT_SECRET")
+
+    # Skip the test if the credentials are not available
+    if not origin or not client_id or not client_secret:
+        pytest.skip("Missing Tuya Cloud API credentials")
+
+    # Create a TuyaCloudAPI instance
+    tuya = TuyaCloudAPI(origin, client_id, client_secret)
+
+    # Try to request a access token
+    response = tuya.request("GET", "/v1.0/token?grant_type=1", False)
+
+    # Check if the response is successful
+    assert response["success"]
