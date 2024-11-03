@@ -10,26 +10,18 @@ pip install tuya-vacuum
 
 ## Usage
 ```python
-from tuya_vacuum.tuya import TuyaCloudAPI
-import requests
+from tuya_vacuum import TuyaVacuum
 
-# Create a new TuyaCloudAPI instance
-tuya = TuyaCloudAPI(
+# Create a new TuyaVacuum instance
+vacuum = TuyaVacuum(
     origin="https://openapi.tuyaus.com",
     client_id="<Client ID>",
-    client_secret="<Client Secret>"
+    client_secret="<Client Secret>",
+    device_id="<Device ID>"
 )
 
-# Request the current realtime map data from the cloud
-device_id = "<Device ID>"
-response = tuya.request("GET", f"/v1.0/users/sweepers/file/{device_id}/realtime-map")
-
-# Get the layout and path data using the returned map urls
-layout_data = requests.get(response["result"][0]["map_url"]).content.hex()
-path_data = requests.get(response["result"][1]["map_url"]).content.hex()
-
 # Parse the map data
-vacuum_map = VacuumMap(layout_data, path_data)
+vacuum_map = vacuum.fetch_realtime_map()
 
 # Save the map as an image
 image = vacuum_map.to_image()
