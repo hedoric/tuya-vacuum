@@ -1,4 +1,4 @@
-"""Functional test for communication with the Tuya Cloud API."""
+"""Tests for the TuyaCloudAPI class."""
 
 import logging
 import os

@@ -28,3 +28,8 @@ markers = [
 
 [tool.ruff.lint]
 extend-select = ["PLE"]
+
+[tool.ruff.flake8-quotes]
+multiline-quotes = "double"
+docstring-quotes = "double"
+inline-quotes = "double"
