@@ -2,9 +2,9 @@
 
 import os
 
-import requests
 from dotenv import load_dotenv
-from tuya_vacuum.tuya import TuyaCloudAPI
+
+import tuya_vacuum
 
 # Load environment variables
 load_dotenv()
@@ -21,28 +21,14 @@ def main():
     BASE = "https://openapi.tuyaus.com"
     ENDPOINT = f"/v1.0/users/sweepers/file/{DEVICE_ID}/realtime-map"
 
-    tuya = TuyaCloudAPI(base=BASE, client_id=CLIENT_ID, client_secret=CLIENT_SECRET)
-    response = tuya.request(ENDPOINT)
+    vacuum = tuya_vacuum.TuyaVacuum(
+        origin=BASE,
+        client_id=CLIENT_ID,
+        client_secret=CLIENT_SECRET,
+        device_id=DEVICE_ID,
+    )
 
-    maps = response["result"]
-
-    for vacuum_map in maps:
-        print(vacuum_map)
-
-        map_url = vacuum_map["map_url"]
-        map_data = requests.get(map_url, timeout=2.5).content
-
-        if vacuum_map["map_type"] == 1:
-            # Save Path Data
-            with open("path.bin", "wb") as file:
-                file.write(map_data)
-        if vacuum_map["map_type"] == 0:
-            # Save Map Data
-            with open("layout.bin", "wb") as file:
-                file.write(map_data)
-        else:
-            # Unknown Map Type
-            print(f"Unknown Map Type: {vacuum_map['map_type']}")
+    vacuum_map = vacuumzetch_realtime_map()
 
 
 if __name__ == "__main__":

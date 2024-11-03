@@ -41,7 +41,7 @@ class TuyaVacuum:
             map_url = result["map_url"]
             map_type = result["map_type"]
             # Use the httpx client to get the map data directly
-            map_data = self.api.client.request("GET", map_url)
+            map_data = self.api.client.request("GET", map_url).content.hex()
 
             if map_type == 0:
                 _LOGGER.debug("Layout map url: %s", map_url)
