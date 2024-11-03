@@ -45,11 +45,11 @@ class TuyaVacuum:
 
             if map_type == 0:
                 _LOGGER.debug("Layout map url: %s", map_url)
-                layout_data = map_data.content
+                layout_data = map_data
 
             elif map_type == 1:
                 _LOGGER.debug("Path map url: %s", map_url)
-                path_data = map_data.content
+                path_data = map_data
 
             else:
                 _LOGGER.warning("Unknown map type: %s", map_type)
