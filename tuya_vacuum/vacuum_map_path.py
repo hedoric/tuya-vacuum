@@ -3,17 +3,15 @@
 # Large parts of this script are based on the following code:
 # https://github.com/tuya/tuya-panel-demo/blob/main/examples/laserSweepRobot/src/protocol/path/index.ts
 
-import logging
-
 import lz4.block
 from PIL import Image, ImageDraw
 
 from tuya_vacuum.utils import (
+    chunks,
+    combine_high_low_to_int,
     create_format_path,
     deal_pl,
     hex_to_ints,
-    chunks,
-    combine_high_low_to_int,
 )
 
 # Length of path header in bytes
@@ -49,6 +47,8 @@ class VacuumMapPath:
 
         @param data: Hexadecimal string of the vacuum path.
         """
+
+        self.raw_data = data
 
         # Parse the header of the path
         self._parse_header(data[: PATH_HEADER_LENGTH * 2])

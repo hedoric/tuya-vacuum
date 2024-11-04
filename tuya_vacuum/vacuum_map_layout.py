@@ -1,18 +1,17 @@
 """Handle the layout of a vacuum map."""
 
 import logging
+import re
 
 import lz4.block
 import numpy as np
 from PIL import Image, ImageColor
-import re
 
 from tuya_vacuum.const import (
-    ORIGIN_MAP_COLOR,
     BITMAP_TYPE_HEX_MAP,
+    ORIGIN_MAP_COLOR,
     pixel_types,
 )
-
 from tuya_vacuum.utils import (
     chunks,
     combine_high_low_to_int,
@@ -35,6 +34,8 @@ class VacuumMapLayout:
 
         @param data: Hexadecimal string of the vacuum map.
         """
+
+        self.raw_data = data
 
         # Parse the header of the map
         self._parse_header(data[:MAP_HEADER_LENGTH])
