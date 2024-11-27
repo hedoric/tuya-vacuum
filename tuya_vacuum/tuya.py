@@ -206,7 +206,7 @@ class TuyaCloudAPI:
             if error_code == 1001 or error_code == 1004:
                 # The secret is invalid or the sign is invalid
                 raise InvalidClientSecretError("Invalid Client Secret")
-            elif error_code == 1005:
+            elif error_code == 1005 or error_code == 2009:
                 # The client_id is invalid
                 raise InvalidClientIDError("Invalid Client ID")
             elif error_code == 2007:
