@@ -3,7 +3,6 @@
 # Large parts of this script are based on the following code:
 # https://github.com/tuya/tuya-panel-demo/blob/main/examples/laserSweepRobot/src/protocol/path/index.ts
 
-import lz4.block
 from PIL import Image, ImageDraw
 
 from tuya_vacuum.utils import (
@@ -13,6 +12,8 @@ from tuya_vacuum.utils import (
     deal_pl,
     hex_to_ints,
 )
+
+from .lz4 import uncompress
 
 # Length of path header in bytes
 PATH_HEADER_LENGTH = 26
@@ -58,11 +59,7 @@ class VacuumMapPath:
         if self.length_after_compression:
             max_buffer_length = self.total_count * 4
             encoded_data_array = bytes(hex_to_ints(data[PATH_HEADER_LENGTH:]))
-            decoded_data_array = lz4.block.decompress(
-                encoded_data_array,
-                uncompressed_size=max_buffer_length,
-                return_bytearray=True,
-            )
+            decoded_data_array = uncompress(encoded_data_array)
             path_data_array = chunks(decoded_data_array, 4)
         else:
             # Floor division

@@ -3,7 +3,6 @@
 import logging
 import re
 
-import lz4.block
 import numpy as np
 from PIL import Image, ImageColor
 
@@ -19,6 +18,8 @@ from tuya_vacuum.utils import (
     shrink_number,
 )
 from tuya_vacuum.vacuum_map_room import VacuumMapRoom
+
+from .lz4 import uncompress
 
 # Length of map header in bytes
 MAP_HEADER_LENGTH = 48
@@ -148,11 +149,7 @@ class VacuumMapLayout:
         if self.length_after_compression:
             max_buffer_length = self.total_count * 8
             encoded_data_array = bytes(hex_to_ints(data[MAP_HEADER_LENGTH:]))
-            decoded_data_array = lz4.block.decompress(
-                encoded_data_array,
-                uncompressed_size=max_buffer_length,
-                return_bytearray=True,
-            )
+            decoded_data_array = uncompress(encoded_data_array)
             area = self.width * self.height
 
             map_data_str = "".join(
@@ -180,12 +177,7 @@ class VacuumMapLayout:
             info_length = MAP_HEADER_LENGTH + self.total_count * 2
             encoded_data_array = bytes(hex_to_ints(data[MAP_HEADER_LENGTH:info_length]))
             max_buffer_length = self.total_count * 4
-            decoded_data_array = lz4.block.decompress(
-                encoded_data_array,
-                uncompressed_size=max_buffer_length,
-                return_bytearray=True,
-            )
-
+            decoded_data_array = uncompress(encoded_data_array)
             self._map_data_array = decoded_data_array[:area]
             map_room_array = decoded_data_array[area:]
 
