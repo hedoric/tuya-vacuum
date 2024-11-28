@@ -5,10 +5,7 @@ import os
 
 from dotenv import load_dotenv
 
-from tuya_vacuum.map.layout import Layout
-from tuya_vacuum.map.map import Map
-from tuya_vacuum.map.path import Path
-from tuya_vacuum.vacuum import Vacuum
+import tuya_vacuum
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -24,7 +21,7 @@ DEVICE_ID = os.environ["DEVICE_ID"]
 
 def main():
     """Download, parse, and save the current real-time vacuum map."""
-    vacuum = Vacuum(ORIGIN, CLIENT_ID, CLIENT_SECRET, DEVICE_ID)
+    vacuum = tuya_vacuum.Vacuum(ORIGIN, CLIENT_ID, CLIENT_SECRET, DEVICE_ID)
 
     vacuum_map_data = vacuum.fetch_realtime_map_data()
     if (
@@ -32,10 +29,10 @@ def main():
         and vacuum_map_data["layout_data"]
         and vacuum_map_data["path_data"]
     ):
-        layout_map = Layout(vacuum_map_data["layout_data"])
-        path_map = Path(vacuum_map_data["path_data"])
-        map = Map(layout_map, path_map)
-        image = map.to_image()
+        layout_map = tuya_vacuum.map.Layout(vacuum_map_data["layout_data"])
+        path_map = tuya_vacuum.map.Path(vacuum_map_data["path_data"])
+        vacuum_map = tuya_vacuum.Map(layout_map, path_map)
+        image = vacuum_map.to_image()
         image.save("map.png")
     else:
         print("Err, what the hell")
