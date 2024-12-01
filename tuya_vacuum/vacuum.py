@@ -4,7 +4,8 @@ import logging
 
 import httpx
 
-from tuya_vacuum.tuya import TuyaCloudAPI
+import tuya_vacuum
+import tuya_vacuum.tuya
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,34 +24,40 @@ class Vacuum:
         """Initialize the Vacuum instance."""
 
         self.device_id = device_id
-        self.api = TuyaCloudAPI(origin, client_id, client_secret, client)
+        self.api = tuya_vacuum.tuya.TuyaCloudAPI(
+            origin, client_id, client_secret, client
+        )
 
-    def fetch_realtime_map_data(self) -> dict:
-        """Get the realtime map from the vacuum cleaner."""
+    def fetch_map(self) -> tuya_vacuum.Map:
+        """Get the current real-time map from the vacuum cleaner."""
 
+        # Get the URLs where map data (ex. layout, path) is stored
         response = self.api.request(
             "GET", f"/v1.0/users/sweepers/file/{self.device_id}/realtime-map"
         )
 
-        layout_data = None
-        path_data = None
+        layout = None
+        path = None
 
-        for result in response["result"]:
-            map_url = result["map_url"]
-            map_type = result["map_type"]
+        for map_part in response["result"]:
+            map_url = map_part["map_url"]
+            map_type = map_part["map_type"]
 
             # Use the httpx client to get the map data directly
             map_data = self.api.client.request("GET", map_url).content
 
-            if map_type == 0:
-                _LOGGER.debug("Layout map url: %s", map_url)
-                layout_data = map_data
+            match map_type:
+                case 0:
+                    layout = tuya_vacuum.map.Layout(map_data)
+                case 1:
+                    path = tuya_vacuum.map.Path(map_data)
+                case _:
+                    _LOGGER.warning("Unknown map type: %s", map_type)
 
-            elif map_type == 1:
-                _LOGGER.debug("Path map url: %s", map_url)
-                path_data = map_data
+        # Important issue for debugging, but still attempt to create the map
+        if layout is None:
+            _LOGGER.warning("No layout data found")
+        if path is None:
+            _LOGGER.warning("No path data found")
 
-            else:
-                _LOGGER.warning("Unknown map type: %s", map_type)
-
-        return {"layout_data": layout_data, "path_data": path_data}
+        return tuya_vacuum.Map(layout, path)
