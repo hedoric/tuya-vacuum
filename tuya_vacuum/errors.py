@@ -1,17 +1,21 @@
 """Package level errors"""
 
 
-class InvalidClientIDError(Exception):
+class TuyaError(Exception):
+    """Tuya Error."""
+
+
+class InvalidClientIDError(TuyaError):
     """Invalid Client ID Error."""
 
 
-class InvalidClientSecretError(Exception):
+class InvalidClientSecretError(TuyaError):
     """Invalid Client Secret Error."""
 
 
-class InvalidDeviceIDError(Exception):
+class InvalidDeviceIDError(TuyaError):
     """Invalid Device ID Error."""
 
 
-class CrossRegionAccessError(Exception):
+class CrossRegionAccessError(TuyaError):
     """Cross Region Access Error."""
