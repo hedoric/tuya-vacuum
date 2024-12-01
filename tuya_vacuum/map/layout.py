@@ -36,6 +36,8 @@ class Layout:
         """
         _LOGGER.debug("Parsing layout")
 
+        self.raw = data
+
         hex_data = data.hex()
 
         # Parse the header of the map

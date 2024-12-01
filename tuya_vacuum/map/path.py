@@ -48,6 +48,8 @@ class Path:
         """
         _LOGGER.debug("Parsing path")
 
+        self.raw = data
+
         # Convert bytes to hex
         hex_data = data.hex()
 
