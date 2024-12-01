@@ -9,6 +9,13 @@ import uuid
 
 import httpx
 
+from tuya_vacuum.errors import (
+    CrossRegionAccessError,
+    InvalidClientIDError,
+    InvalidClientSecretError,
+    InvalidDeviceIDError,
+)
+
 _LOGGER = logging.getLogger(__name__)
 
 # The SHA256 hash of a empty request body
@@ -16,22 +23,6 @@ EMPTY_BODY_HASH = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b
 
 # Tuya Cloud API endpoint to get an access token
 ACCESS_TOKEN_ENDPOINT = "/v1.0/token?grant_type=1"
-
-
-class InvalidClientIDError(Exception):
-    """Invalid Client ID Error."""
-
-
-class InvalidClientSecretError(Exception):
-    """Invalid Client Secret Error."""
-
-
-class InvalidDeviceIDError(Exception):
-    """Invalid Device ID Error."""
-
-
-class CrossRegionAccessError(Exception):
-    """Cross Region Access Error."""
 
 
 class TuyaCloudAPI:

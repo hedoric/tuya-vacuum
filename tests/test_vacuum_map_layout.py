@@ -1,7 +1,6 @@
 """Test the vacuum_map module."""
 
-from tuya_vacuum.vacuum_map_layout import VacuumMapLayout
-
+from tuya_vacuum.map.layout import Layout
 
 
 def test_vacuum_map_header():
@@ -9,10 +8,10 @@ def test_vacuum_map_header():
 
     with open("./tests/layout.bin", "rb") as file:
         # Read the file as a hex string
-        data = file.read().hex()
+        data = file.read()
 
         # Parse the map data
-        vacuum_map = VacuumMapLayout(data)
+        vacuum_map = Layout(data)
 
         # Assert that the header values are correct
         assert vacuum_map.version == 1
@@ -35,10 +34,10 @@ def test_vacuum_map_room():
 
     with open("./tests/layout.bin", "rb") as file:
         # Read the file as a hex string
-        data = file.read().hex()
+        data = file.read()
 
         # Parse the map data
-        vacuum_map = VacuumMapLayout(data)
+        vacuum_map = Layout(data)
 
         # Assert that the room values are correct
         assert vacuum_map.rooms[0].id == 5

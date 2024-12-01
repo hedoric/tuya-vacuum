@@ -1,10 +1,10 @@
-"""Classes to handle a vacuum path."""
+"""The Path class."""
 
-# Large parts of this script are based on the following code:
-# https://github.com/tuya/tuya-panel-demo/blob/main/examples/laserSweepRobot/src/protocol/path/index.ts
+import logging
 
 from PIL import Image, ImageDraw
 
+from tuya_vacuum.lz4 import uncompress
 from tuya_vacuum.utils import (
     chunks,
     combine_high_low_to_int,
@@ -13,9 +13,7 @@ from tuya_vacuum.utils import (
     hex_to_ints,
 )
 
-from .lz4 import uncompress
-
-# Length of path header in bytes
+# The length of the path header in bytes
 PATH_HEADER_LENGTH = 26
 
 # Multiplier to increase the size of the path
@@ -37,23 +35,61 @@ PATH_CHARGER_MARKER_COLOR = "green"
 PATH_CHARGER_MARKER_OUTLINE_RADIUS = 20
 PATH_CHARGER_MARKER_OUTLINE_COLOR = "white"
 
-format_path_point = create_format_path(reverse_y=True, hide_path=True)
+_LOGGER = logging.getLogger(__name__)
 
 
-class VacuumMapPath:
-    """A vacuums movement path on a vacuum map."""
+class Path:
+    """The navigation path of a vacuum cleaner."""
 
-    def __init__(self, data: str) -> None:
+    def __init__(self, data: bytes) -> None:
         """Parse the data of a vacuum path.
 
-        @param data: Hexadecimal string of the vacuum path.
+        @param data: Raw bytes of the vacuum path.
         """
+        _LOGGER.debug("Parsing path")
 
-        self.raw_data = data
+        self.raw = data
+
+        # Convert bytes to hex
+        hex_data = data.hex()
 
         # Parse the header of the path
-        self._parse_header(data[: PATH_HEADER_LENGTH * 2])
+        self._parse_header(hex_data[: PATH_HEADER_LENGTH * 2])
 
+        # Parse the body of the path
+        self._parse_body(hex_data)
+
+        _LOGGER.debug("Finished parsing path")
+
+    def _parse_header(self, data: str) -> None:
+        """Parse the header of the vacuum path.
+
+        @param data: Hexidecimal string of the path header.
+        """
+        data_array = hex_to_ints(data)
+        self.version = data_array[0]
+        self.force_update = data_array[3]
+        self.type = data_array[4]
+
+        # This might be missing proper formatDataHeaderException handling
+        self.id = [
+            combine_high_low_to_int(integer[0], integer[1])
+            for integer in chunks(data_array[1:3], 2)
+        ][0]
+
+        self.total_count = int(data[10:18], 16)
+
+        # This might be missing proper formatDataHeaderException handling
+        [self.theta, self.length_after_compression] = [
+            combine_high_low_to_int(integer[0], integer[1])
+            for integer in chunks(data_array[9:13], 2)
+        ]
+
+    def _parse_body(self, data: str) -> None:
+        """Parse the body of the vacuum path.
+
+        @param data: Hexidecimal string of the path body.
+        """
         data_array = hex_to_ints(data)
 
         if self.length_after_compression:
@@ -73,39 +109,13 @@ class VacuumMapPath:
                 deal_pl(combine_high_low_to_int(high, low))
                 for high, low in chunks(point, 2)
             ]
+            format_path_point = create_format_path(reverse_y=True, hide_path=True)
             real_point = format_path_point(x, y)
             path_data.append(real_point)
 
         self._path_data = path_data
         self.start_count = len(path_data)
         self.current_count = len(path_data)
-        self.is_full = True
-        self.origin_data = data_array[:PATH_HEADER_LENGTH]
-
-    def _parse_header(self, data: str) -> None:
-        """Parse the header of the vacuum path.
-
-        @param data: The data of the path header.
-        """
-
-        data_array = hex_to_ints(data)
-        self.version = data_array[0]
-        self.force_update = data_array[3]
-        self.type = data_array[4]
-
-        # This might be missing proper formatDataHeaderException handling
-        self.id = [
-            combine_high_low_to_int(integer[0], integer[1])
-            for integer in chunks(data_array[1:3], 2)
-        ][0]
-
-        self.total_count = int(data[10:18], 16)
-
-        # This might be missing proper formatDataHeaderException handling
-        [self.theta, self.length_after_compression] = [
-            combine_high_low_to_int(integer[0], integer[1])
-            for integer in chunks(data_array[9:13], 2)
-        ]
 
     def to_image(
         self, width: int, height: int, origin_point: tuple[int, int]

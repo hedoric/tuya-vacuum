@@ -1,6 +1,6 @@
 """Module to get maps from tuya vacuums."""
 
-from tuya_vacuum.vacuum import TuyaVacuum
-from tuya_vacuum.vacuum_map import VacuumMap
+from .map import Map
+from .vacuum import Vacuum
 
-__all__ = ["VacuumMap", "TuyaVacuum"]
+__all__ = ["Map", "Vacuum"]

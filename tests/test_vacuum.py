@@ -4,9 +4,9 @@ import pytest
 from pytest_httpx import HTTPXMock
 from pytest_mock import MockerFixture
 
-from tuya_vacuum.vacuum import TuyaVacuum
-from tuya_vacuum.vacuum_map_layout import VacuumMapLayout
-from tuya_vacuum.vacuum_map_path import VacuumMapPath
+from tuya_vacuum.map.layout import Layout
+from tuya_vacuum.map.path import Path
+from tuya_vacuum.vacuum import Vacuum
 
 CORRECT_CLIENT_ID = "correct_client_id"
 CORRECT_CLIENT_SECRET = "correct_client_secret"
@@ -19,7 +19,7 @@ CORRECT_ORIGIN = (
 @pytest.mark.skip(reason="Test not correctly implemented yet")
 def test_fetch_realtime_map(mocker: MockerFixture, httpx_mock: HTTPXMock):
     """Test fetching the realtime map."""
-    vacuum = TuyaVacuum(
+    vacuum = Vacuum(
         CORRECT_ORIGIN, CORRECT_CLIENT_ID, CORRECT_CLIENT_SECRET, CORRECT_DEVICE_ID
     )
 
@@ -58,19 +58,10 @@ def test_fetch_realtime_map(mocker: MockerFixture, httpx_mock: HTTPXMock):
     httpx_mock.add_response(url=f"{CORRECT_ORIGIN}/layout.bin", content=b"layout_data")
     httpx_mock.add_response(url=f"{CORRECT_ORIGIN}/unknown.bin")
 
-    f1 = mocker.patch(
-        "tuya_vacuum.vacuum_map_layout.VacuumMapLayout.__init__", return_value=None
-    )
-    f2 = mocker.patch(
-        "tuya_vacuum.vacuum_map_path.VacuumMapPath.__init__", return_value=None
-    )
-
-    vacuum_map = vacuum.fetch_realtime_map()
-
-    # Check that the VacuumMapLayout and VacuumMapPath were initialized correctly
-    f1.assert_called_once_with(b"layout_data")
-    f2.assert_called_once_with(b"path_data")
+    vacuum_map_data = vacuum.fetch_realtime_map_data()
+    layout = Layout(vacuum_map_data["layout_data"])
+    path = Path(vacuum_map_data["path_data"])
 
     # Check that the VacuumMap was initialized correctly
-    assert isinstance(vacuum_map.layout, VacuumMapLayout)
-    assert isinstance(vacuum_map.path, VacuumMapPath)
+    assert isinstance(layout, Layout)
+    assert isinstance(path, Path)
