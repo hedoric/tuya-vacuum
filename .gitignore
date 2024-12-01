@@ -8,6 +8,7 @@ venv
 dist
 
 # Hide files made while manually testing
-/layout.bin
+layout.bin
 path.bin
 combined.png
+map.png
