@@ -33,16 +33,16 @@ class Vacuum:
         """
         Get the current map from the vacuum cleaner.
 
-        Falls back to /list + /download if realtime-map is empty
-        (as on Mongsa MS1).
+        MS1 note: falls back to /list + /download if realtime-map returns an empty list.
         """
         response = self.api.request(
             "GET", f"/v1.0/users/sweepers/file/{self.device_id}/realtime-map"
         )
 
+        # Mongsa MS1 returns success:true with result=[]
         if not response.get("result"):
             _LOGGER.debug("Realtime map empty → falling back to file-based map")
-            return self.fetch_latest_map_file()
+            return self._fetch_latest_map_file()
 
         layout = None
         path = None
@@ -54,6 +54,7 @@ class Vacuum:
             if not map_url:
                 continue
 
+            # Download the part
             map_data = self.api.client.request("GET", map_url).content
 
             match map_type:
@@ -71,9 +72,11 @@ class Vacuum:
 
         return tuya_vacuum.Map(layout, path)
 
-    def fetch_latest_map_file(self) -> tuya_vacuum.Map:
+    # --- internal helpers ---
+
+    def _fetch_latest_map_file(self) -> tuya_vacuum.Map:
         """Retrieve the most recent map via /list → /download endpoints."""
-        # Step 1: list maps
+        # 1) list maps
         list_resp = self.api.request(
             "GET",
             f"/v1.0/users/sweepers/file/{self.device_id}/list?page_no=1&page_size=1",
@@ -87,7 +90,7 @@ class Vacuum:
         first = items[0]
         record_id = first["id"] if isinstance(first, dict) else first
 
-        # Step 2: download links
+        # 2) download links
         dl_resp = self.api.request(
             "GET",
             f"/v1.0/users/sweepers/file/{self.device_id}/download?id={record_id}",
@@ -97,22 +100,11 @@ class Vacuum:
         if not url:
             raise RuntimeError("Download links missing (no app_map/robot_map)")
 
-        # Step 3: download and decode
+        # 3) download and decode
         raw = self.api.client.request("GET", url).content
-        data = raw
-        if len(data) >= 2 and data[:2] == b"\x1f\x8b":
-            data = gzip.decompress(data)
-        if data[:1] in (b"{", b"["):
-            try:
-                j = json.loads(data.decode("utf-8", "ignore"))
-                if isinstance(j, dict):
-                    enc = j.get("img") or j.get("map") or j.get("data")
-                    if isinstance(enc, str):
-                        data = base64.b64decode(enc)
-            except Exception as e:
-                _LOGGER.debug("JSON parse error on fallback map: %s", e)
+        data = self._decode_if_needed(raw)
 
-        # Step 4: wrap in Map
+        # 4) wrap in Map (layout is enough to render)
         try:
             layout = tuya_vacuum.map.Layout(data)
             path = None
@@ -121,3 +113,29 @@ class Vacuum:
             layout, path = None, None
 
         return tuya_vacuum.Map(layout, path)
+
+    @staticmethod
+    def _decode_if_needed(data: bytes) -> bytes:
+        """Handle gzip or JSON(base64) envelopes if present."""
+        # gzip?
+        if len(data) >= 2 and data[:2] == b"\x1f\x8b":
+            try:
+                data = gzip.decompress(data)
+            except Exception:
+                pass
+
+        # JSON envelope with b64?
+        if data[:1] in (b"{", b"["):
+            try:
+                j = json.loads(data.decode("utf-8", "ignore"))
+                if isinstance(j, dict):
+                    enc = j.get("img") or j.get("map") or j.get("data")
+                    if isinstance(enc, str):
+                        try:
+                            data = base64.b64decode(enc)
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+        return data
