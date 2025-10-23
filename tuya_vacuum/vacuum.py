@@ -4,7 +4,6 @@ import logging
 import base64
 import gzip
 import json
-
 import httpx
 
 import tuya_vacuum
@@ -30,24 +29,30 @@ class Vacuum:
             origin, client_id, client_secret, client
         )
 
-    # --- existing realtime map fetch ---
     def fetch_map(self) -> tuya_vacuum.Map:
-        """Get the current real-time map from the vacuum cleaner."""
+        """
+        Get the current map from the vacuum cleaner.
+
+        Falls back to /list + /download if realtime-map is empty
+        (as on Mongsa MS1).
+        """
         response = self.api.request(
             "GET", f"/v1.0/users/sweepers/file/{self.device_id}/realtime-map"
         )
 
-        # Fallback trigger: some models (e.g., Mongsa MS1) return an empty result
         if not response.get("result"):
-            _LOGGER.debug("Realtime map empty, falling back to file-based map")
+            _LOGGER.debug("Realtime map empty → falling back to file-based map")
             return self.fetch_latest_map_file()
 
         layout = None
         path = None
 
         for map_part in response["result"]:
-            map_url = map_part["map_url"]
-            map_type = map_part["map_type"]
+            map_url = map_part.get("map_url")
+            map_type = map_part.get("map_type")
+
+            if not map_url:
+                continue
 
             map_data = self.api.client.request("GET", map_url).content
 
@@ -66,13 +71,9 @@ class Vacuum:
 
         return tuya_vacuum.Map(layout, path)
 
-    # --- new fallback for devices with no realtime map ---
     def fetch_latest_map_file(self) -> tuya_vacuum.Map:
-        """
-        Download the most recent map file via Tuya's /list and /download endpoints.
-        Used when the realtime-map result is empty.
-        """
-        # 1) List available map files
+        """Retrieve the most recent map via /list → /download endpoints."""
+        # Step 1: list maps
         list_resp = self.api.request(
             "GET",
             f"/v1.0/users/sweepers/file/{self.device_id}/list?page_no=1&page_size=1",
@@ -84,9 +85,9 @@ class Vacuum:
             raise RuntimeError("No map files available for fallback")
 
         first = items[0]
-        record_id = first["id"] if isinstance(first, dict) and "id" in first else first
+        record_id = first["id"] if isinstance(first, dict) else first
 
-        # 2) Get download links for latest map
+        # Step 2: download links
         dl_resp = self.api.request(
             "GET",
             f"/v1.0/users/sweepers/file/{self.device_id}/download?id={record_id}",
@@ -96,12 +97,10 @@ class Vacuum:
         if not url:
             raise RuntimeError("Download links missing (no app_map/robot_map)")
 
-        # 3) Download map file
+        # Step 3: download and decode
         raw = self.api.client.request("GET", url).content
-
-        # 4) Decode if necessary
         data = raw
-        if len(data) >= 2 and data[0] == 0x1F and data[1] == 0x8B:
+        if len(data) >= 2 and data[:2] == b"\x1f\x8b":
             data = gzip.decompress(data)
         if data[:1] in (b"{", b"["):
             try:
@@ -111,15 +110,14 @@ class Vacuum:
                     if isinstance(enc, str):
                         data = base64.b64decode(enc)
             except Exception as e:
-                _LOGGER.debug("Fallback map JSON parse failed: %s", e)
+                _LOGGER.debug("JSON parse error on fallback map: %s", e)
 
-        # Some devices deliver the map as a single PNG image
+        # Step 4: wrap in Map
         try:
             layout = tuya_vacuum.map.Layout(data)
             path = None
         except Exception as e:
             _LOGGER.warning("Failed to parse fallback map layout: %s", e)
-            layout = None
-            path = None
+            layout, path = None, None
 
         return tuya_vacuum.Map(layout, path)
