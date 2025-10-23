@@ -3,33 +3,21 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "tuya-vacuum"
-version = "0.1.9"
-description = "A python library to view maps from Tuya robot vacuums"
+name = "tuya-vacuum-ms1"
+version = "0.1.6"
+description = "Fork of tuya-vacuum with Mongsa MS1 fallback support"
 authors = [
-    { name = "Jaiden Labelle", email = "jaidenjlabelle@gmail.com" }
+    { name = "hedoric", email = "example@example.com" }
 ]
 readme = "README.md"
-requires-python = ">=3.6"
+requires-python = ">=3.10"
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
+dependencies = ["httpx>=0.27"]
 
 [project.urls]
-Homepage = "https://github.com/jaidenlabelle/tuya-vacuum"
-Issues = "https://github.com/jaidenlabelle/tuya-vacuum/issues"
-
-[tool.pytest.ini_options]
-markers = [
-    "functional: mark a test as functional (can be slow or require external resources)",
-]
-
-[tool.ruff.lint]
-extend-select = ["PLE"]
-
-[tool.ruff.flake8-quotes]
-multiline-quotes = "double"
-docstring-quotes = "double"
-inline-quotes = "double"
+Homepage = "https://github.com/hedoric/tuya-vacuum-ms1"
+Issues = "https://github.com/hedoric/tuya-vacuum-ms1/issues"
