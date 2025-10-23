@@ -1,6 +1,7 @@
-"""Module to get maps from tuya vacuums."""
+"""Public interface for the tuya_vacuum library."""
 
-from .map import Map
-from .vacuum import Vacuum
+from .vacuum import Vacuum  # export your class
+from . import tuya  # low-level API client module
+from . import map as map  # expose map module for Layout/Path/Map classes
 
-__all__ = ["Map", "Vacuum"]
+__all__ = ["Vacuum", "tuya", "map"]
