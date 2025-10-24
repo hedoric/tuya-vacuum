@@ -3,17 +3,41 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
+# Name of your fork (this must match the #egg=... in Home Assistant's manifest)
 name = "tuya-vacuum-ms1"
 version = "0.1.6"
-description = "Fork of tuya-vacuum with Mongsa MS1 fallback support"
-authors = [{ name = "hedoric" }]
+description = "Fork of tuya-vacuum with Mongsa MS1 realtime-map fallback support"
+authors = [
+    { name = "hedoric" }
+]
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["httpx>=0.27"]
+dependencies = [
+    "httpx>=0.27"
+]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
 
 [project.urls]
 Homepage = "https://github.com/hedoric/tuya-vacuum-ms1"
 Issues = "https://github.com/hedoric/tuya-vacuum-ms1/issues"
 
+[tool.pytest.ini_options]
+markers = [
+    "functional: mark a test as functional (can be slow or require external resources)",
+]
+
+[tool.ruff.lint]
+extend-select = ["PLE"]
+
+[tool.ruff.flake8-quotes]
+multiline-quotes = "double"
+docstring-quotes = "double"
+inline-quotes = "double"
+
+# 👇 this tells Hatch which directory to include in the wheel build
 [tool.hatch.build.targets.wheel]
 packages = ["tuya_vacuum"]
